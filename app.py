@@ -4,7 +4,7 @@ import anthropic
 import json
 import os
 import re
-from notifications import register_lead
+from notifications import register_lead, is_quota_exceeded, write_usage
 
 
 def _md_inline(text: str) -> str:
@@ -345,6 +345,21 @@ st.markdown("""
 
   /* Alert */
   .stAlert { border-radius: var(--radius) !important; }
+
+  /* ── Mobile: keep button rows horizontal ── */
+  @media (max-width: 480px) {
+    [data-testid="stHorizontalBlock"] {
+      flex-wrap: wrap !important;
+    }
+    [data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] {
+      flex-shrink: 1 !important;
+      min-width: 0 !important;
+    }
+    .stButton > button {
+      font-size: 0.78rem !important;
+      padding: 0.4rem 0.6rem !important;
+    }
+  }
 
   /* ── Radio nav hidden off-screen (used only as state trigger) ── */
   div[data-testid="stRadio"] {
@@ -1242,14 +1257,20 @@ if not st.session_state.email_unlocked:
             placeholder="you@example.com",
             label_visibility="collapsed",
         )
-        if st.button("Unlock Free Access →", use_container_width=True):
-            if "@" in email_input and "." in email_input:
-                st.session_state.user_email = email_input
-                st.session_state.email_unlocked = True
-                register_lead(email_input)
-                st.rerun()
-            else:
-                st.error("Please enter a valid email address.")
+        _valid_email = (
+            "@" in email_input
+            and "." in email_input.split("@")[-1]
+            and len(email_input) > 5
+        )
+        if st.button(
+            "Unlock Free Access →",
+            use_container_width=True,
+            disabled=not _valid_email,
+        ):
+            st.session_state.user_email = email_input
+            st.session_state.email_unlocked = True
+            register_lead(email_input)
+            st.rerun()
 
         st.markdown("""
         <div style="text-align:center; color:#4A4640; font-size:0.72rem; margin-top:0.8rem;">
@@ -1420,58 +1441,56 @@ if st.session_state.page == "Hunger Decoder":
         key="hunger_input",
     )
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([5, 2])
     with col1:
         send_clicked = st.button("🔬 Run Biological Diagnosis", use_container_width=True)
     with col2:
         st.button(
-            "🗑️ Clear Chat",
+            "🗑️ Clear",
             use_container_width=True,
             on_click=lambda: st.session_state.update({"chat_history": []}),
         )
 
     if send_clicked and user_input.strip():
-        # Add user message
-        st.session_state.chat_history.append({"role": "user", "content": user_input.strip()})
-
-        # Build messages for API
-        messages = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in st.session_state.chat_history
-        ]
-
-        # Stream response
-        with st.spinner("Analyzing your biological signals..."):
-            try:
-                client = get_client()
-                full_response = ""
-                response_placeholder = st.empty()
-
-                with client.messages.stream(
-                    model="claude-sonnet-4-6",
-                    max_tokens=1024,
-                    system=SYSTEM_PROMPT,
-                    messages=messages,
-                ) as stream:
-                    for text in stream.text_stream:
-                        full_response += text
-                        response_placeholder.markdown(f"""
-                        <div class="chat-ai">
-                            <div class="chat-label">Rigged Game Breaker AI</div>
-                            {md_to_html(full_response)}▌
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                response_placeholder.empty()
-                st.session_state.chat_history.append(
-                    {"role": "assistant", "content": full_response}
-                )
-                st.rerun()
-
-            except anthropic.AuthenticationError:
-                st.error("⚠️ API key not configured. Set the ANTHROPIC_API_KEY environment variable.")
-            except Exception as e:
-                st.error(f"Connection error: {str(e)}")
+        _email = st.session_state.get("user_email", "")
+        _blocked, _msg = is_quota_exceeded(_email)
+        if _blocked:
+            st.error(_msg)
+        else:
+            st.session_state.chat_history.append({"role": "user", "content": user_input.strip()})
+            messages = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in st.session_state.chat_history
+            ]
+            with st.spinner("Analyzing your biological signals..."):
+                try:
+                    client = get_client()
+                    full_response = ""
+                    response_placeholder = st.empty()
+                    with client.messages.stream(
+                        model="claude-sonnet-4-6",
+                        max_tokens=1024,
+                        system=SYSTEM_PROMPT,
+                        messages=messages,
+                    ) as stream:
+                        for text in stream.text_stream:
+                            full_response += text
+                            response_placeholder.markdown(f"""
+                            <div class="chat-ai">
+                                <div class="chat-label">Rigged Game Breaker AI</div>
+                                {md_to_html(full_response)}▌
+                            </div>
+                            """, unsafe_allow_html=True)
+                    response_placeholder.empty()
+                    write_usage(_email)
+                    st.session_state.chat_history.append(
+                        {"role": "assistant", "content": full_response}
+                    )
+                    st.rerun()
+                except anthropic.AuthenticationError:
+                    st.error("⚠️ API key not configured.")
+                except Exception as e:
+                    st.error(f"Connection error: {str(e)}")
 
     elif send_clicked:
         st.warning("Please describe how you're feeling before running the diagnosis.")
@@ -1489,29 +1508,35 @@ if st.session_state.page == "Hunger Decoder":
     for i, example in enumerate(examples):
         with cols[i % 2]:
             if st.button(f"💬 {example[:60]}...", key=f"ex_{i}", use_container_width=True):
-                st.session_state.chat_history.append({"role": "user", "content": example})
-                with st.spinner("Analyzing..."):
-                    try:
-                        client = get_client()
-                        full_response = ""
-                        messages = [{"role": msg["role"], "content": msg["content"]}
-                                    for msg in st.session_state.chat_history]
-                        with client.messages.stream(
-                            model="claude-sonnet-4-6",
-                            max_tokens=1024,
-                            system=SYSTEM_PROMPT,
-                            messages=messages,
-                        ) as stream:
-                            for text in stream.text_stream:
-                                full_response += text
-                        st.session_state.chat_history.append(
-                            {"role": "assistant", "content": full_response}
-                        )
-                        st.rerun()
-                    except anthropic.AuthenticationError:
-                        st.error("⚠️ Set ANTHROPIC_API_KEY to enable AI responses.")
-                    except Exception as e:
-                        st.error(str(e))
+                _email = st.session_state.get("user_email", "")
+                _blocked, _msg = is_quota_exceeded(_email)
+                if _blocked:
+                    st.error(_msg)
+                else:
+                    st.session_state.chat_history.append({"role": "user", "content": example})
+                    with st.spinner("Analyzing..."):
+                        try:
+                            client = get_client()
+                            full_response = ""
+                            messages = [{"role": msg["role"], "content": msg["content"]}
+                                        for msg in st.session_state.chat_history]
+                            with client.messages.stream(
+                                model="claude-sonnet-4-6",
+                                max_tokens=1024,
+                                system=SYSTEM_PROMPT,
+                                messages=messages,
+                            ) as stream:
+                                for text in stream.text_stream:
+                                    full_response += text
+                            write_usage(_email)
+                            st.session_state.chat_history.append(
+                                {"role": "assistant", "content": full_response}
+                            )
+                            st.rerun()
+                        except anthropic.AuthenticationError:
+                            st.error("⚠️ Set ANTHROPIC_API_KEY to enable AI responses.")
+                        except Exception as e:
+                            st.error(str(e))
 
 # ─── Page: Metabolic Dashboard ────────────────────────────────────────────────
 elif st.session_state.page == "Metabolic Dashboard":

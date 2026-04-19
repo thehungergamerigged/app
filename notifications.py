@@ -1,12 +1,16 @@
 import os
 import base64
 import datetime
+import pathlib
 from email.mime.text import MIMEText
 
-SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-GMAIL_SCOPES  = ["https://www.googleapis.com/auth/gmail.send"]
-SA_KEY_PATH   = "service_account.json"
-GMAIL_TOKEN   = "gmail_token.json"
+SHEETS_SCOPES  = ["https://www.googleapis.com/auth/spreadsheets"]
+GMAIL_SCOPES   = ["https://www.googleapis.com/auth/gmail.send"]
+_HERE          = pathlib.Path(__file__).parent
+SA_KEY_PATH    = str(_HERE / "service_account.json")
+GMAIL_TOKEN    = str(_HERE / "gmail_token.json")
+USAGE_SHEET    = "Usage"
+MAX_USES       = 3
 
 
 def _get_secret(key: str) -> str:
@@ -82,3 +86,63 @@ def register_lead(email: str):
     """Save to sheet and send notification. Silent on partial failures."""
     save_email_to_sheet(email)
     send_notification_email(email)
+
+
+def _usage_sheet_service():
+    """Return (sheets_service, spreadsheet_id) or (None, None) on failure."""
+    spreadsheet_id = _get_secret("GOOGLE_SHEET_ID")
+    if not spreadsheet_id:
+        return None, None
+    return _sheets_service(), spreadsheet_id
+
+
+def write_usage(email: str) -> bool:
+    """Append one usage row for the given email."""
+    try:
+        svc, sid = _usage_sheet_service()
+        if svc is None:
+            return False
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        svc.spreadsheets().values().append(
+            spreadsheetId=sid,
+            range=f"{USAGE_SHEET}!A:B",
+            valueInputOption="USER_ENTERED",
+            body={"values": [[email, timestamp]]},
+        ).execute()
+        return True
+    except Exception as e:
+        try:
+            import streamlit as st
+            st.warning(f"Usage write failed: {e}")
+        except Exception:
+            print(f"Usage write failed: {e}")
+        return False
+
+
+def is_quota_exceeded(email: str) -> tuple[bool, str]:
+    """Return (blocked, message). blocked=True when email hit MAX_USES."""
+    if not email:
+        return False, ""
+    try:
+        svc, sid = _usage_sheet_service()
+        if svc is None:
+            return False, ""
+        result = svc.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range=f"{USAGE_SHEET}!A:A",
+        ).execute()
+        rows = result.get("values", [])
+        count = sum(1 for r in rows if r and r[0].strip().lower() == email.strip().lower())
+        if count >= MAX_USES:
+            return True, (
+                f"You've used your {MAX_USES} free analyses. "
+                "Upgrade to unlock unlimited access."
+            )
+        return False, ""
+    except Exception as e:
+        try:
+            import streamlit as st
+            st.warning(f"Quota check failed: {e}")
+        except Exception:
+            print(f"Quota check failed: {e}")
+        return False, ""
