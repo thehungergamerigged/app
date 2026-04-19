@@ -1,0 +1,18 @@
+# Secrets — never push these
+.streamlit/secrets.toml
+service_account.json
+gmail_token.json
+gmail_oauth.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Node
+node_modules/
+
+# Logs
+*.log
+main_output.log

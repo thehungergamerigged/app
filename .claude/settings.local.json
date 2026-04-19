@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(notepad *)",
+      "Bash(streamlit run *)",
+      "Bash(start *)",
+      "Bash(ipconfig *)",
+      "Bash(taskkill /F /IM streamlit.exe)",
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

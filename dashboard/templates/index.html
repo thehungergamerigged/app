@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TruthStrike — Misinformation Monitor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a14;
+      --surface: #12121f;
+      --surface2: #1a1a2e;
+      --border: #252540;
+      --accent: #00d4ff;
+      --green: #00e676;
+      --red: #ff1744;
+      --yellow: #ffd600;
+      --text: #e0e0f0;
+      --muted: #666680;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0d0d1f 0%, #12122a 100%);
+      border-bottom: 2px solid var(--accent);
+      padding: 18px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo h1 { font-size: 24px; color: var(--accent); letter-spacing: 1px; }
+    .logo-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    .live-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .dot.offline { background: var(--red); animation: none; }
+    .dot.reconnecting { background: var(--yellow); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,.4); }
+      50% { opacity: .6; box-shadow: 0 0 0 6px rgba(0,230,118,0); }
+    }
+
+    /* ── Stats ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      padding: 28px 40px;
+    }
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      text-align: center;
+      transition: transform .2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card.total  { border-color: #00d4ff44; }
+    .stat-card.real   { border-color: #00e67644; }
+    .stat-card.fake   { border-color: #ff174444; }
+    .stat-card.uncertain { border-color: #ffd60044; }
+
+    .stat-num { font-size: 42px; font-weight: 700; line-height: 1; }
+    .stat-card.total  .stat-num { color: var(--accent); }
+    .stat-card.real   .stat-num { color: var(--green); }
+    .stat-card.fake   .stat-num { color: var(--red); }
+    .stat-card.uncertain .stat-num { color: var(--yellow); }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+    /* ── Controls ── */
+    .controls {
+      padding: 0 40px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls-label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+    .btn-filter {
+      padding: 6px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-filter:hover { border-color: var(--accent); color: var(--text); }
+    .btn-filter.active { color: var(--bg); font-weight: 600; }
+    .btn-filter.f-all.active      { background: var(--accent); border-color: var(--accent); color: #000; }
+    .btn-filter.f-real.active     { background: var(--green);  border-color: var(--green);  color: #000; }
+    .btn-filter.f-fake.active     { background: var(--red);    border-color: var(--red);    color: #fff; }
+    .btn-filter.f-uncertain.active{ background: var(--yellow); border-color: var(--yellow); color: #000; }
+
+    /* ── Feed ── */
+    .feed { padding: 0 40px 48px; }
+    .feed-header {
+      font-size: 15px;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .video-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+    .video-card:hover { border-color: #333360; }
+    .video-card.REAL     { border-left-color: var(--green); }
+    .video-card.FAKE     { border-left-color: var(--red); }
+    .video-card.UNCERTAIN{ border-left-color: var(--yellow); }
+    .video-card.new-entry { animation: slide-in .4s ease-out; }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .card-title { font-size: 15px; font-weight: 600; line-height: 1.4; flex: 1; }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge.REAL     { background: #00e67622; color: var(--green); border: 1px solid #00e67644; }
+    .badge.FAKE     { background: #ff174422; color: var(--red);   border: 1px solid #ff174444; }
+    .badge.UNCERTAIN{ background: #ffd60022; color: var(--yellow);border: 1px solid #ffd60044; }
+
+    .card-meta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 10px 0 8px;
+    }
+    .card-meta a { color: var(--accent); text-decoration: none; }
+    .card-meta a:hover { text-decoration: underline; }
+
+    .ai-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .ai-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .conf-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .conf-bar {
+      flex: 1;
+      height: 5px;
+      background: var(--surface);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .conf-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+    .REAL     .conf-fill { background: var(--green); }
+    .FAKE     .conf-fill { background: var(--red); }
+    .UNCERTAIN .conf-fill { background: var(--yellow); }
+    .conf-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    .card-reasoning {
+      font-size: 12px;
+      color: #9090b0;
+      line-height: 1.55;
+      margin-bottom: 8px;
+    }
+    .flags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .flag {
+      background: #1e1e38;
+      color: var(--accent);
+      border: 1px solid #2a2a50;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 52px; margin-bottom: 16px; }
+    .empty-title { font-size: 18px; color: #555570; margin-bottom: 6px; }
+    .empty-sub   { font-size: 13px; }
+
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      header, .stats, .controls, .feed { padding-left: 20px; padding-right: 20px; }
+    }
+    @media (max-width: 600px) {
+      header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+      .logo h1 { font-size: 18px; }
+      .stats { grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+      .stat-card { padding: 14px 12px; border-radius: 10px; }
+      .stat-num { font-size: 30px; }
+      .controls { padding: 0 16px 14px; gap: 8px; }
+      .btn-filter { padding: 5px 12px; font-size: 12px; }
+      .feed { padding: 0 16px 32px; }
+      .video-card { padding: 14px 14px; }
+      .card-top { flex-direction: column; gap: 8px; }
+      .badge { align-self: flex-start; }
+      .card-title { font-size: 14px; }
+      .ai-row { gap: 6px; }
+      .ai-chip { font-size: 10px; padding: 3px 8px; }
+    }
+    @media (max-width: 380px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      .stat-num { font-size: 26px; }
+      .btn-filter { padding: 4px 10px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div>
+      <h1>🎯 TruthStrike</h1>
+      <div class="logo-sub">Real-time Misinformation Monitor</div>
+    </div>
+  </div>
+  <div class="live-status">
+    <span class="dot" id="dot"></span>
+    <span id="conn-label">Connecting…</span>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat-card total">
+    <div class="stat-num" id="s-total">{{ stats.total }}</div>
+    <div class="stat-label">📊 Total Analyzed</div>
+  </div>
+  <div class="stat-card real">
+    <div class="stat-num" id="s-real">{{ stats.REAL }}</div>
+    <div class="stat-label">✅ Real</div>
+  </div>
+  <div class="stat-card fake">
+    <div class="stat-num" id="s-fake">{{ stats.FAKE }}</div>
+    <div class="stat-label">❌ Fake</div>
+  </div>
+  <div class="stat-card uncertain">
+    <div class="stat-num" id="s-uncertain">{{ stats.UNCERTAIN }}</div>
+    <div class="stat-label">⚠️ Uncertain</div>
+  </div>
+</div>
+
+<div class="controls">
+  <span class="controls-label">Filter:</span>
+  <button class="btn-filter f-all active"      onclick="filter(this,'ALL')">All</button>
+  <button class="btn-filter f-real"            onclick="filter(this,'REAL')">✅ Real</button>
+  <button class="btn-filter f-fake"            onclick="filter(this,'FAKE')">❌ Fake</button>
+  <button class="btn-filter f-uncertain"       onclick="filter(this,'UNCERTAIN')">⚠️ Uncertain</button>
+</div>
+
+<div class="feed">
+  <div class="feed-header">📡 Live Analysis Feed</div>
+  <div id="feed">
+    {% if records %}
+      {% for r in records %}
+      <div class="video-card {{ r.FinalVerdict | default('UNCERTAIN') }}"
+           data-verdict="{{ r.FinalVerdict | default('UNCERTAIN') }}">
+        <div class="card-top">
+          <div class="card-title">{{ r.Title | default('Unknown Title') }}</div>
+          <span class="badge {{ r.FinalVerdict | default('UNCERTAIN') }}">
+            {% if r.FinalVerdict == 'REAL' %}✅{% elif r.FinalVerdict == 'FAKE' %}❌{% else %}⚠️{% endif %}
+            {{ r.FinalVerdict | default('UNCERTAIN') }}
+          </span>
+        </div>
+        <div class="card-meta">
+          <span>📺 {{ r.Channel | default('') }}</span>
+          <span>🕐 {{ (r.ProcessedAt or '')[:16] }}</span>
+          <span>🤝 {{ r.Consensus | default('') }}</span>
+          {% if r.URL %}<a href="{{ r.URL }}" target="_blank" rel="noopener">🔗 Watch</a>{% endif %}
+        </div>
+        <div class="ai-row">
+          <span class="ai-chip">🔮 Gemini: {{ r.GeminiVerdict | default('?') }}</span>
+          <span class="ai-chip">🤖 Claude: {{ r.ClaudeVerdict | default('?') }}</span>
+          <span class="ai-chip">💡 GPT: {{ r.GPTVerdict | default('?') }}</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar">
+            <div class="conf-fill" style="width:{{ r.Confidence | default(0) }}%"></div>
+          </div>
+          <span class="conf-label">{{ r.Confidence | default(0) }}% confidence</span>
+        </div>
+        {% if r.Reasoning %}
+        <div class="card-reasoning">
+          {{ r.Reasoning[:280] }}{% if r.Reasoning|length > 280 %}…{% endif %}
+        </div>
+        {% endif %}
+        {% if r.Flags %}
+        <div class="flags">
+          {% for f in r.Flags.split(', ') %}{% if f %}<span class="flag">{{ f }}</span>{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="empty" id="empty-state">
+      <div class="empty-icon">📡</div>
+      <div class="empty-title">Monitoring channels…</div>
+      <div class="empty-sub">New videos will appear here as they're analyzed</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  let activeFilter = 'ALL';
+
+  function filter(btn, verdict) {
+    activeFilter = verdict;
+    document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.video-card').forEach(card => {
+      card.style.display = (verdict === 'ALL' || card.dataset.verdict === verdict) ? '' : 'none';
+    });
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function buildCard(d) {
+    const emoji = d.final_verdict === 'REAL' ? '✅' : d.final_verdict === 'FAKE' ? '❌' : '⚠️';
+    const flags = (d.flags || []).map(f => `<span class="flag">${esc(f)}</span>`).join('');
+    const reasoning = esc((d.reasoning || '').slice(0, 280)) + ((d.reasoning||'').length > 280 ? '…' : '');
+    const ts = (d.processed_at || '').slice(0,16);
+    return `
+      <div class="video-card ${esc(d.final_verdict)} new-entry" data-verdict="${esc(d.final_verdict)}">
+        <div class="card-top">
+          <div class="card-title">${esc(d.title)}</div>
+          <span class="badge ${esc(d.final_verdict)}">${emoji} ${esc(d.final_verdict)}</span>
+        </div>
+        <div class="card-meta">
+          <span>📺 ${esc(d.channel)}</span>
+          <span>🕐 ${esc(ts)}</span>
+          <span>🤝 ${esc(d.consensus||'')}</span>
+          ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">🔗 Watch</a>` : ''}
+        </div>
+        <div class="ai-row">
+          <span class="ai-chip">🔮 Gemini: ${esc(d.gemini_verdict||'?')}</span>
+          <span class="ai-chip">🤖 Claude: ${esc(d.claude_verdict||'?')}</span>
+          <span class="ai-chip">💡 GPT: ${esc(d.gpt_verdict||'?')}</span>
+        </div>
+        <div class="conf-row">
+          <div class="conf-bar"><div class="conf-fill" style="width:${d.confidence||0}%"></div></div>
+          <span class="conf-label">${d.confidence||0}% confidence</span>
+        </div>
+        ${reasoning ? `<div class="card-reasoning">${reasoning}</div>` : ''}
+        ${flags ? `<div class="flags">${flags}</div>` : ''}
+      </div>`;
+  }
+
+  function updateStats(s) {
+    if (!s) return;
+    document.getElementById('s-total').textContent    = s.total    ?? 0;
+    document.getElementById('s-real').textContent     = s.REAL     ?? 0;
+    document.getElementById('s-fake').textContent     = s.FAKE     ?? 0;
+    document.getElementById('s-uncertain').textContent= s.UNCERTAIN ?? 0;
+  }
+
+  function connect() {
+    const dot   = document.getElementById('dot');
+    const label = document.getElementById('conn-label');
+    const feed  = document.getElementById('feed');
+    const es    = new EventSource('/events');
+
+    es.onopen = () => {
+      dot.className = 'dot';
+      label.textContent = 'Live';
+      label.style.color = 'var(--green)';
+    };
+
+    es.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      if (d.type === 'new_video') {
+        const empty = document.getElementById('empty-state');
+        if (empty) empty.remove();
+        feed.insertAdjacentHTML('afterbegin', buildCard(d));
+        if (activeFilter !== 'ALL' && d.final_verdict !== activeFilter) {
+          feed.firstElementChild.style.display = 'none';
+        }
+        updateStats(d.stats);
+      }
+    };
+
+    es.onerror = () => {
+      dot.className = 'dot reconnecting';
+      label.textContent = 'Reconnecting…';
+      label.style.color = 'var(--yellow)';
+      es.close();
+      setTimeout(connect, 5000);
+    };
+  }
+
+  connect();
+</script>
+</body>
+</html>

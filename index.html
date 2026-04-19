@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TruthStrike - מערכת לזיהוי מידע כוזב</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d0d0d;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 3rem;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .logo { font-size: 1.6rem; font-weight: 800; letter-spacing: 1px; }
+    .logo span:first-child { color: #fff; }
+    .logo span:last-child  { color: #e63946; }
+    .nav-links { list-style: none; display: flex; gap: 2rem; }
+    .nav-links a { color: #aaa; text-decoration: none; font-size: .95rem; transition: color .2s; }
+    .nav-links a:hover { color: #e63946; }
+    .nav-cta { background: #e63946; color: #fff !important; padding: .5rem 1.2rem; border-radius: 6px; font-weight: 600; }
+    .nav-cta:hover { background: #c1121f !important; }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 7rem 2rem 5rem;
+      background: radial-gradient(ellipse at center top, rgba(230,57,70,.12) 0%, transparent 65%);
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(230,57,70,.15);
+      border: 1px solid rgba(230,57,70,.35);
+      color: #e63946;
+      font-size: .78rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      padding: .35rem 1rem; border-radius: 20px; margin-bottom: 1.5rem;
+    }
+    .hero h1 { font-size: clamp(2.4rem,5vw,4rem); font-weight: 900; line-height: 1.15; color: #fff; margin-bottom: 1.4rem; }
+    .hero h1 em { font-style: normal; color: #e63946; }
+    .hero p  { font-size: 1.15rem; color: #999; max-width: 600px; margin: 0 auto 2.5rem; line-height: 1.7; }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: #e63946; color: #fff;
+      padding: .85rem 2rem; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none;
+      transition: background .2s, transform .15s; display: inline-flex; align-items: center; gap: .5rem;
+    }
+    .btn-primary:hover:not(:disabled) { background: #c1121f; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-secondary {
+      background: transparent; color: #ccc;
+      padding: .85rem 2rem; border: 1px solid rgba(255,255,255,.15); border-radius: 8px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-secondary:hover { border-color: #e63946; color: #e63946; }
+
+    /* ── Analyzer Box (text) ── */
+    .analyzer-section { max-width: 800px; margin: 0 auto 5rem; padding: 0 2rem; }
+    .analyzer-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px; padding: 2rem;
+    }
+    .analyzer-box h2 { font-size: 1.3rem; color: #fff; margin-bottom: 1rem; }
+    .analyzer-box textarea {
+      width: 100%; background: rgba(0,0,0,.4);
+      border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+      color: #e0e0e0; font-size: .95rem; padding: 1rem;
+      resize: vertical; min-height: 120px; font-family: inherit; transition: border-color .2s;
+    }
+    .analyzer-box textarea:focus { outline: none; border-color: #e63946; }
+    .analyzer-box textarea::placeholder { color: #555; }
+    .analyzer-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
+    /* ── YouTube Analyzer ── */
+    .yt-section {
+      max-width: 860px;
+      margin: 0 auto 5rem;
+      padding: 0 2rem;
+    }
+    .yt-section-header {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .yt-section-header .yt-icon {
+      width: 44px; height: 44px;
+      background: #ff0000;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; flex-shrink: 0;
+    }
+    .yt-section-header h2 { font-size: 1.6rem; font-weight: 800; color: #fff; }
+    .yt-section-header p  { color: #777; font-size: .9rem; margin-top: .2rem; }
+
+    .yt-form-box {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px; padding: 2rem;
+    }
+    .yt-input-row {
+      display: flex; gap: .75rem; flex-wrap: wrap;
+    }
+    .yt-input-row input {
+      flex: 1; min-width: 200px;
+      background: rgba(0,0,0,.5);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      color: #e0e0e0; font-size: 1rem; padding: .85rem 1.1rem;
+      font-family: inherit; transition: border-color .2s;
+      direction: ltr; text-align: left;
+    }
+    .yt-input-row input:focus { outline: none; border-color: #e63946; }
+    .yt-input-row input::placeholder { color: #444; }
+
+    /* spinner inside button */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .spinner.active { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status bar ── */
+    .yt-status {
+      margin-top: 1rem;
+      font-size: .88rem;
+      color: #888;
+      min-height: 1.4em;
+      transition: color .2s;
+    }
+    .yt-status.error { color: #e63946; }
+
+    /* ── Results ── */
+    #results {
+      margin-top: 2rem;
+      display: none;
+      animation: fadeIn .4s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    .result-card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    /* Score header */
+    .result-header {
+      display: flex; align-items: center; gap: 1.5rem;
+      padding: 1.8rem 2rem;
+      flex-wrap: wrap;
+    }
+    .score-ring {
+      position: relative; width: 90px; height: 90px; flex-shrink: 0;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring circle { transition: stroke-dashoffset 1s ease; }
+    .score-label {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .score-number { font-size: 1.6rem; font-weight: 900; color: #fff; line-height: 1; }
+    .score-pct    { font-size: .7rem; color: #888; }
+
+    .verdict-info { flex: 1; }
+    .verdict-badge {
+      display: inline-block;
+      font-size: .8rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: .3rem .9rem; border-radius: 20px; margin-bottom: .6rem;
+    }
+    .verdict-badge.green  { background: rgba(34,197,94,.15);  color: #22c55e; border: 1px solid rgba(34,197,94,.3);  }
+    .verdict-badge.yellow { background: rgba(234,179,8,.15);  color: #eab308; border: 1px solid rgba(234,179,8,.3);  }
+    .verdict-badge.orange { background: rgba(249,115,22,.15); color: #f97316; border: 1px solid rgba(249,115,22,.3); }
+    .verdict-badge.red    { background: rgba(230,57,70,.15);  color: #e63946; border: 1px solid rgba(230,57,70,.3);  }
+
+    .result-summary { color: #ccc; font-size: .95rem; line-height: 1.6; }
+
+    /* Thumbnail */
+    .result-thumb {
+      width: 120px; height: 68px; object-fit: cover;
+      border-radius: 8px; flex-shrink: 0;
+    }
+
+    /* Divider */
+    .result-divider { border: none; border-top: 1px solid rgba(255,255,255,.07); margin: 0; }
+
+    /* Detail sections */
+    .result-body { padding: 1.5rem 2rem; display: grid; gap: 1.5rem; }
+
+    .detail-block h4 {
+      font-size: .8rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: #666; margin-bottom: .75rem;
+    }
+
+    .claim-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+    .claim-list li {
+      display: flex; align-items: flex-start; gap: .6rem;
+      font-size: .9rem; color: #bbb; line-height: 1.5;
+    }
+    .claim-list li::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      margin-top: .45em; flex-shrink: 0;
+    }
+    .claim-list.bad  li::before { background: #e63946; }
+    .claim-list.good li::before { background: #22c55e; }
+
+    .lang-analysis {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px; padding: 1rem;
+      font-size: .9rem; color: #aaa; line-height: 1.6;
+    }
+
+    .recommendation-box {
+      background: rgba(230,57,70,.06);
+      border: 1px solid rgba(230,57,70,.2);
+      border-radius: 10px; padding: 1rem 1.2rem;
+      font-size: .92rem; color: #ddd; line-height: 1.6;
+    }
+    .recommendation-box strong { color: #e63946; }
+
+    /* ── Stats ── */
+    .stats-section {
+      background: rgba(230,57,70,.06);
+      border-top: 1px solid rgba(230,57,70,.15);
+      border-bottom: 1px solid rgba(230,57,70,.15);
+      padding: 3.5rem 2rem; margin: 4rem 0;
+    }
+    .stats-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 3rem; max-width: 900px; margin: 0 auto; }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 2.8rem; font-weight: 900; color: #e63946; }
+    .stat-label { color: #777; font-size: .9rem; margin-top: .3rem; }
+
+    /* ── Features ── */
+    .features-section { padding: 4rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-title    { text-align: center; font-size: 2rem; font-weight: 800; color: #fff; margin-bottom: .6rem; }
+    .section-subtitle { text-align: center; color: #777; font-size: 1rem; margin-bottom: 3rem; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 1.5rem; }
+    .feature-card {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px; padding: 1.8rem; transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: rgba(230,57,70,.4); transform: translateY(-3px); }
+    .feature-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .feature-card h3 { font-size: 1.1rem; color: #fff; margin-bottom: .6rem; font-weight: 700; }
+    .feature-card p  { color: #777; font-size: .9rem; line-height: 1.6; }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 2.5rem; color: #444; font-size: .85rem; border-top: 1px solid rgba(255,255,255,.05); }
+    footer a { color: #e63946; text-decoration: none; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      nav {
+        padding: 1rem 1.2rem;
+        flex-wrap: wrap;
+        gap: .6rem;
+      }
+      .nav-links {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        font-size: .82rem;
+      }
+      .hero { padding: 4rem 1.2rem 3rem; }
+      .hero-actions { flex-direction: column; align-items: stretch; }
+      .btn-primary, .btn-secondary { text-align: center; justify-content: center; }
+      .analyzer-section { padding: 0 1.2rem; margin-bottom: 3rem; }
+      .analyzer-box { padding: 1.2rem; }
+      .yt-section { padding: 0 1.2rem; margin-bottom: 3rem; }
+      .yt-form-box { padding: 1.2rem; }
+      .yt-input-row { flex-direction: column; }
+      .yt-input-row input { width: 100%; min-width: unset; }
+      .result-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .result-thumb { width: 100%; height: auto; }
+      .result-body { padding: 1rem 1.2rem; }
+      .features-section { padding: 3rem 1.2rem; }
+      .section-title { font-size: 1.5rem; }
+      .stats-section { padding: 2.5rem 1.2rem; }
+      .stats-grid { gap: 1.5rem; }
+      .stat-value { font-size: 2.2rem; }
+      footer { padding: 1.8rem 1.2rem; }
+    }
+
+    @media (max-width: 480px) {
+      .logo { font-size: 1.3rem; }
+      .nav-links { gap: .6rem; }
+      .nav-links a { font-size: .78rem; }
+      .score-ring { align-self: center; }
+      .stats-grid { grid-template-columns: 1fr 1fr; display: grid; gap: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="logo"><span>Truth</span><span>Strike</span></div>
+    <ul class="nav-links">
+      <li><a href="#">אודות</a></li>
+      <li><a href="#">איך זה עובד</a></li>
+      <li><a href="#">ממצאים</a></li>
+      <li><a href="#yt-analyzer" class="nav-cta">נתח סרטון</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="badge">בינה מלאכותית נגד דיסאינפורמציה</div>
+    <h1>זהה <em>מידע כוזב</em><br />לפני שהוא מתפשט</h1>
+    <p>TruthStrike מנתחת סרטוני יוטיוב וטקסטים בזמן אמת — ומדווחת על רמת האמינות שלהם תוך שניות.</p>
+    <div class="hero-actions">
+      <a href="#yt-analyzer" class="btn-primary">נסה עכשיו</a>
+      <a href="#features" class="btn-secondary">ראה יכולות</a>
+    </div>
+  </section>
+
+  <!-- Text Analyzer -->
+  <section class="analyzer-section">
+    <div class="analyzer-box">
+      <h2>בדוק טענה עכשיו</h2>
+      <textarea placeholder="הדבק כאן טקסט, כותרת, ציטוט או קישור לבדיקה..."></textarea>
+      <div class="analyzer-actions">
+        <button class="btn-primary">נתח &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       YouTube Video Analyzer
+  ════════════════════════════════════════════════ -->
+  <section class="yt-section" id="yt-analyzer">
+    <div class="yt-section-header">
+      <div class="yt-icon">▶</div>
+      <div>
+        <h2>ניתוח סרטון יוטיוב</h2>
+        <p>הדבק קישור לסרטון — המערכת תאחזר את התמליל ותנתח אותו עם Claude AI</p>
+      </div>
+    </div>
+
+    <div class="yt-form-box">
+      <div class="yt-input-row">
+        <input
+          type="url"
+          id="yt-url"
+          placeholder="https://www.youtube.com/watch?v=..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn-primary" id="analyze-btn" onclick="analyzeVideo()">
+          <span class="spinner" id="spinner"></span>
+          <span id="btn-text">נתח סרטון</span>
+        </button>
+      </div>
+      <div class="yt-status" id="status"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="result-card">
+
+        <!-- Header: score + verdict + thumbnail -->
+        <div class="result-header">
+          <div class="score-ring">
+            <svg width="90" height="90" viewBox="0 0 90 90">
+              <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>
+              <circle id="score-arc" cx="45" cy="45" r="38" fill="none"
+                      stroke="#e63946" stroke-width="7"
+                      stroke-dasharray="238.76" stroke-dashoffset="238.76"
+                      stroke-linecap="round"/>
+            </svg>
+            <div class="score-label">
+              <span class="score-number" id="score-num">0</span>
+              <span class="score-pct">/ 100</span>
+            </div>
+          </div>
+
+          <div class="verdict-info">
+            <div class="verdict-badge" id="verdict-badge">—</div>
+            <div class="result-summary" id="result-summary"></div>
+          </div>
+
+          <img id="result-thumb" class="result-thumb" src="" alt="תמונה מקדימה" style="display:none"/>
+        </div>
+
+        <hr class="result-divider"/>
+
+        <!-- Body -->
+        <div class="result-body">
+
+          <div class="detail-block" id="problematic-block" style="display:none">
+            <h4>טענות בעייתיות</h4>
+            <ul class="claim-list bad" id="problematic-list"></ul>
+          </div>
+
+          <div class="detail-block" id="positive-block" style="display:none">
+            <h4>אינדיקטורים חיוביים</h4>
+            <ul class="claim-list good" id="positive-list"></ul>
+          </div>
+
+          <div class="detail-block" id="lang-block" style="display:none">
+            <h4>ניתוח שפה</h4>
+            <div class="lang-analysis" id="lang-analysis"></div>
+          </div>
+
+          <div class="detail-block" id="rec-block" style="display:none">
+            <h4>המלצה</h4>
+            <div class="recommendation-box" id="recommendation"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-section">
+    <div class="stats-grid">
+      <div class="stat-item"><div class="stat-value">2.4M+</div><div class="stat-label">טענות נבדקו</div></div>
+      <div class="stat-item"><div class="stat-value">94%</div><div class="stat-label">דיוק זיהוי</div></div>
+      <div class="stat-item"><div class="stat-value">&lt;3s</div><div class="stat-label">זמן ניתוח ממוצע</div></div>
+      <div class="stat-item"><div class="stat-value">180+</div><div class="stat-label">מקורות נבדקים</div></div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <section class="features-section" id="features">
+    <h2 class="section-title">יכולות המערכת</h2>
+    <p class="section-subtitle">טכנולוגיה מתקדמת לניתוח אמינות מידע</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">▶</div>
+        <h3>ניתוח סרטוני יוטיוב</h3>
+        <p>מאחזרת את תמליל הסרטון אוטומטית ומנתחת את תוכנו בעזרת AI מתקדם.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>ניתוח טקסט עמוק</h3>
+        <p>מזהה דפוסי לשון מניפולטיביים, הטיות רגשיות וחוסר עקביות לוגית.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>ציון אמינות</h3>
+        <p>מייצרת ציון אמינות מפורט עם הסבר ברור על הגורמים שהשפיעו על התוצאה.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>זמן אמת</h3>
+        <p>תוצאות תוך שניות — מותאמת לקצב הפצת המידע ברשתות החברתיות.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>API פתוח</h3>
+        <p>שלב את יכולות הזיהוי ישירות בפלטפורמה שלך בעזרת ה-API הפשוט שלנו.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>פרטיות מלאה</h3>
+        <p>הטקסטים שאתה מגיש אינם נשמרים. הניתוח מתבצע באופן מאובטח ואנונימי.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 TruthStrike. כל הזכויות שמורות. &nbsp;|&nbsp; <a href="#">תנאי שימוש</a> &nbsp;|&nbsp; <a href="#">מדיניות פרטיות</a></p>
+  </footer>
+
+  <script>
+    const CIRCUMFERENCE = 2 * Math.PI * 38; // ≈ 238.76
+
+    const colorMap = {
+      green:  { stroke: '#22c55e', badgeClass: 'green'  },
+      yellow: { stroke: '#eab308', badgeClass: 'yellow' },
+      orange: { stroke: '#f97316', badgeClass: 'orange' },
+      red:    { stroke: '#e63946', badgeClass: 'red'    },
+    };
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'yt-status' + (isError ? ' error' : '');
+    }
+
+    function setLoading(loading) {
+      const btn     = document.getElementById('analyze-btn');
+      const spinner = document.getElementById('spinner');
+      const btnText = document.getElementById('btn-text');
+      btn.disabled  = loading;
+      spinner.className = loading ? 'spinner active' : 'spinner';
+      btnText.textContent = loading ? 'מנתח...' : 'נתח סרטון';
+    }
+
+    function renderResults(analysis, videoId) {
+      const color = colorMap[analysis.verdict_color] || colorMap.orange;
+
+      // Score ring animation
+      const arc   = document.getElementById('score-arc');
+      const score = Math.max(0, Math.min(100, analysis.score));
+      const offset = CIRCUMFERENCE * (1 - score / 100);
+      arc.style.stroke = color.stroke;
+      // Trigger transition
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { arc.style.strokeDashoffset = offset; });
+      });
+
+      // Score number
+      let current = 0;
+      const target = score;
+      const step = () => {
+        current = Math.min(current + Math.ceil(target / 40), target);
+        document.getElementById('score-num').textContent = current;
+        if (current < target) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+
+      // Verdict badge
+      const badge = document.getElementById('verdict-badge');
+      badge.textContent = analysis.verdict;
+      badge.className   = `verdict-badge ${color.badgeClass}`;
+
+      // Summary
+      document.getElementById('result-summary').textContent = analysis.summary || '';
+
+      // Thumbnail
+      if (videoId) {
+        const thumb = document.getElementById('result-thumb');
+        thumb.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+        thumb.style.display = 'block';
+      }
+
+      // Problematic claims
+      const probBlock = document.getElementById('problematic-block');
+      const probList  = document.getElementById('problematic-list');
+      const claims    = analysis.problematic_claims || [];
+      if (claims.length) {
+        probList.innerHTML = claims.map(c => `<li>${escHtml(c)}</li>`).join('');
+        probBlock.style.display = 'block';
+      }
+
+      // Positive indicators
+      const posBlock = document.getElementById('positive-block');
+      const posList  = document.getElementById('positive-list');
+      const positives = analysis.positive_indicators || [];
+      if (positives.length) {
+        posList.innerHTML = positives.map(p => `<li>${escHtml(p)}</li>`).join('');
+        posBlock.style.display = 'block';
+      }
+
+      // Language analysis
+      if (analysis.language_analysis) {
+        document.getElementById('lang-analysis').textContent = analysis.language_analysis;
+        document.getElementById('lang-block').style.display = 'block';
+      }
+
+      // Recommendation
+      if (analysis.recommendation) {
+        document.getElementById('recommendation').innerHTML =
+          `<strong>מה לעשות:</strong> ${escHtml(analysis.recommendation)}`;
+        document.getElementById('rec-block').style.display = 'block';
+      }
+
+      // Show results panel
+      const results = document.getElementById('results');
+      results.style.display = 'block';
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function resetResults() {
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('score-arc').style.strokeDashoffset = CIRCUMFERENCE;
+      document.getElementById('score-num').textContent = '0';
+      ['problematic-block','positive-block','lang-block','rec-block'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+      });
+      document.getElementById('result-thumb').style.display = 'none';
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function analyzeVideo() {
+      const url = document.getElementById('yt-url').value.trim();
+      if (!url) { setStatus('יש להזין כתובת URL של סרטון יוטיוב.', true); return; }
+
+      resetResults();
+      setLoading(true);
+      setStatus('מאחזר תמליל ומתחיל ניתוח…');
+
+      try {
+        const response = await fetch('/api/analyze-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let   buffer  = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete last line
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = JSON.parse(line.slice(6));
+
+            if (payload.type === 'progress') {
+              setStatus('מנתח עם Claude AI…');
+            } else if (payload.type === 'done') {
+              setStatus('הניתוח הושלם.');
+              renderResults(payload.analysis, payload.videoId);
+            } else if (payload.type === 'error') {
+              setStatus(payload.error, true);
+            }
+          }
+        }
+
+        // Handle HTTP-level errors (non-SSE)
+        if (!response.ok && response.status !== 200) {
+          const data = await response.json().catch(() => ({}));
+          setStatus(data.error || 'שגיאה לא ידועה.', true);
+        }
+
+      } catch (err) {
+        setStatus('שגיאת רשת — ודא שהשרת פועל על פורט 3000.', true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Allow Enter key in URL input
+    document.getElementById('yt-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') analyzeVideo();
+    });
+  </script>
+</body>
+</html>
