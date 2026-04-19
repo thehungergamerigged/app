@@ -20,9 +20,18 @@ def _get_secret(key: str) -> str:
 def _sheets_service():
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
-    creds = service_account.Credentials.from_service_account_file(
-        SA_KEY_PATH, scopes=SHEETS_SCOPES
-    )
+
+    # Try Streamlit secrets first (Streamlit Cloud), fall back to local file
+    try:
+        import streamlit as st
+        sa_info = dict(st.secrets["gcp_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=SHEETS_SCOPES
+        )
+    except Exception:
+        creds = service_account.Credentials.from_service_account_file(
+            SA_KEY_PATH, scopes=SHEETS_SCOPES
+        )
     return build("sheets", "v4", credentials=creds)
 
 
